@@ -88,10 +88,12 @@ class MarketplaceMonitor:
         from .parsers.generic import GenericParser
         from .parsers.nike import NikeParser
         from .parsers.adidas import AdidasParser
+        from .parsers.mango import MangoParser
         
         registry.register('generic', GenericParser)
         registry.register('nike', NikeParser)
         registry.register('adidas', AdidasParser)
+        registry.register('mango', MangoParser)
         
         self.logger.info(f"Registered parsers: {registry.list_parsers()}")
     
