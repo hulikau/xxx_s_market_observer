@@ -42,7 +42,12 @@ class ParserRegistry:
             return None
         
         # Create instance key including config for caching
-        config_key = str(sorted(config.items())) if config else ""
+        if config:
+            # Filter out None values and create a stable key
+            filtered_config = {k: v for k, v in config.items() if v is not None}
+            config_key = str(sorted(filtered_config.items()))
+        else:
+            config_key = ""
         instance_key = f"{name}:{config_key}"
         
         # Return cached instance if available

@@ -162,7 +162,9 @@ class MangoParser(BaseParser):
                                 except json.JSONDecodeError:
                                     continue
                 except Exception as e:
-                    self.logger.debug(f"Failed to parse Mango JSON data: {e}")
+                    # Use logging instead of self.logger in case logger isn't initialized yet
+                    import logging
+                    logging.getLogger("parser.mango").debug(f"Failed to parse Mango JSON data: {e}")
                     continue
             
             # Pattern 2: Direct JSON objects with productInfo

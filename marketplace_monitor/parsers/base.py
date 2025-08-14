@@ -2,7 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Any, Set
 from urllib.parse import urlparse
 import requests
@@ -15,17 +15,11 @@ class ParseResult:
     
     url: str
     product_name: Optional[str] = None
-    available_sizes: Set[str] = None
+    available_sizes: Set[str] = field(default_factory=set)
     price: Optional[str] = None
     in_stock: bool = False
     error: Optional[str] = None
-    metadata: Dict[str, Any] = None
-    
-    def __post_init__(self):
-        if self.available_sizes is None:
-            self.available_sizes = set()
-        if self.metadata is None:
-            self.metadata = {}
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class BaseParser(ABC):
