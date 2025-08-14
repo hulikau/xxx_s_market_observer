@@ -290,51 +290,69 @@ class MangoParser(BaseParser):
         """Check Mango size availability from HTML elements."""
         available_sizes = set()
         
-        # Strategy 1: Size buttons with specific classes
-        size_buttons = soup.find_all('button', class_=re.compile(r'size', re.I))
-        for button in size_buttons:
-            if self._is_mango_size_unavailable(button):
-                continue
-            
-            size_text = button.get_text(strip=True)
-            if size_text:
-                normalized = self._normalize_size(size_text)
-                for norm_target, original_target in normalized_targets.items():
-                    if norm_target == normalized or norm_target in normalized:
-                        available_sizes.add(original_target)
+        # Strategy 1: Look for Mango's specific size list structure
+        # Find size list items with the specific Mango classes (they have suffixes like __o9_m)
+        size_items = soup.find_all('li', class_=lambda x: x and any('SizesList_listItem' in cls for cls in x))
         
-        # Strategy 2: Size list items
-        size_items = soup.find_all('li', class_=re.compile(r'size', re.I))
+        # If the class-based search doesn't work, fallback to finding all li elements in size context
+        if not size_items:
+            # Look for li elements within size-related containers
+            size_containers = soup.find_all(['div', 'ol'], class_=lambda x: x and any('SizesList' in cls for cls in x))
+            for container in size_containers:
+                size_items.extend(container.find_all('li'))
+            self.logger.debug(f"🔄 Using fallback: found {len(size_items)} li elements in size containers")
+        
+        self.logger.debug(f"🔍 Found {len(size_items)} size list items with SizesList_listItem class")
+        
         for item in size_items:
-            if self._is_mango_size_unavailable(item):
+            # Look for the size button within the list item
+            size_button = item.find('button', class_=lambda x: x and any('SizeItem_sizeItem' in cls for cls in x))
+            
+            # Fallback: if specific class search fails, use any button in the item
+            if not size_button:
+                size_button = item.find('button')
+                if size_button:
+                    self.logger.debug("🔄 Using fallback button search")
+            
+            if not size_button:
+                self.logger.debug("❌ No button found in size item")
                 continue
             
-            # Look for size text in spans or direct text
-            size_spans = item.find_all('span')
-            for span in size_spans:
-                size_text = span.get_text(strip=True)
+            # Check if this size is unavailable
+            if self._is_mango_size_unavailable(size_button):
+                self.logger.debug(f"❌ Size button marked as unavailable")
+                continue
+            
+            # Extract size from font tags (Mango uses <font> tags for size text)
+            size_fonts = size_button.find_all('font')
+            for font in size_fonts:
+                size_text = font.get_text(strip=True)
                 if size_text and len(size_text) <= 5:  # Size labels are typically short
+                    self.logger.debug(f"🔍 Found size text in font: '{size_text}'")
                     normalized = self._normalize_size(size_text)
                     for norm_target, original_target in normalized_targets.items():
                         if norm_target == normalized or norm_target in normalized:
+                            self.logger.debug(f"✅ Size match: '{size_text}' -> '{original_target}'")
                             available_sizes.add(original_target)
         
-        # Strategy 3: Generic size selectors
-        size_elements = soup.find_all(['button', 'span', 'div'], 
-                                    string=lambda text: text and any(
-                                        target in str(text).upper() 
-                                        for target in normalized_targets.keys()
-                                    ))
-        
-        for element in size_elements:
-            if self._is_mango_size_unavailable(element):
-                continue
+        # Strategy 2: Fallback to generic size buttons (if the above doesn't work)
+        if not available_sizes:
+            self.logger.debug("🔄 Using fallback strategy for size detection")
+            size_buttons = soup.find_all('button', class_=re.compile(r'size', re.I))
+            self.logger.debug(f"🔍 Found {len(size_buttons)} generic size buttons")
             
-            size_text = element.get_text(strip=True)
-            normalized = self._normalize_size(size_text)
-            for norm_target, original_target in normalized_targets.items():
-                if norm_target == normalized or norm_target in normalized:
-                    available_sizes.add(original_target)
+            for button in size_buttons:
+                if self._is_mango_size_unavailable(button):
+                    continue
+                
+                size_text = button.get_text(strip=True)
+                if size_text and len(size_text) <= 5:
+                    self.logger.debug(f"🔍 Found size text in button: '{size_text}'")
+                    normalized = self._normalize_size(size_text)
+                    for norm_target, original_target in normalized_targets.items():
+                        if norm_target == normalized or norm_target in normalized:
+                            self.logger.debug(f"✅ Size match: '{size_text}' -> '{original_target}'")
+                            available_sizes.add(original_target)
         
         return available_sizes
     
@@ -371,10 +389,24 @@ class MangoParser(BaseParser):
                 # but with low stock. For now, let's treat it as available.
                 if 'nur wenige' in text or 'only few' in text:
                     continue
+                self.logger.debug(f"❌ Found unavailable text: '{unavailable_text}'")
                 return True
         
-        # Check for specific Mango classes that indicate unavailability
+        # Check for Mango-specific SizeItemContent_notAvailable class
         classes = element.get('class', [])
+        class_string = ' '.join(classes)
+        
+        # Also check child elements for the notAvailable class
+        unavailable_spans = element.find_all('span', class_=lambda x: x and any('SizeItemContent_notAvailable' in cls for cls in x))
+        if unavailable_spans:
+            self.logger.debug("❌ Found SizeItemContent_notAvailable class in child elements")
+            return True
+        
+        if 'SizeItemContent_notAvailable' in class_string:
+            self.logger.debug("❌ Found SizeItemContent_notAvailable class")
+            return True
+        
+        # Check for other unavailability classes
         unavailable_classes = [
             'notavailable',
             'not-available', 
@@ -384,9 +416,10 @@ class MangoParser(BaseParser):
             'disabled',
         ]
         
-        class_string = ' '.join(classes).lower()
+        class_string_lower = class_string.lower()
         for unavailable_class in unavailable_classes:
-            if unavailable_class in class_string:
+            if unavailable_class in class_string_lower:
+                self.logger.debug(f"❌ Found unavailable class: '{unavailable_class}'")
                 return True
         
         # Check parent elements for unavailability indicators
