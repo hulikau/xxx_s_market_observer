@@ -46,6 +46,12 @@ class GenericParser(BaseParser):
             result.available_sizes = available_sizes
             result.in_stock = len(available_sizes) > 0
             
+            # Log size detection results
+            if available_sizes:
+                self.logger.info(f"✅ Found {len(available_sizes)} available sizes: {', '.join(sorted(available_sizes))}")
+            else:
+                self.logger.info(f"❌ No target sizes found. Target sizes were: {', '.join(target_sizes)}")
+            
             # Add metadata
             result.metadata = {
                 'parser': 'generic',

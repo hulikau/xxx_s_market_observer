@@ -30,10 +30,22 @@ class MangoParser(BaseParser):
             result.product_name = self._extract_mango_product_name(soup)
             result.price = self._extract_mango_price(soup)
             
+            # Log extracted product information
+            if result.product_name:
+                self.logger.info(f"📦 Product: {result.product_name}")
+            if result.price:
+                self.logger.info(f"💰 Price: {result.price}")
+            
             # Check size availability
             available_sizes = self._check_mango_sizes(soup, target_sizes)
             result.available_sizes = available_sizes
             result.in_stock = len(available_sizes) > 0
+            
+            # Log size detection results
+            if available_sizes:
+                self.logger.info(f"✅ Found {len(available_sizes)} available sizes: {', '.join(sorted(available_sizes))}")
+            else:
+                self.logger.info(f"❌ No target sizes found. Target sizes were: {', '.join(target_sizes)}")
             
             result.metadata = {
                 'parser': 'mango',
@@ -148,14 +160,28 @@ class MangoParser(BaseParser):
         available_sizes = set()
         normalized_targets = {self._normalize_size(size): size for size in target_sizes}
         
+        self.logger.debug(f"🔍 Looking for sizes: {target_sizes}")
+        self.logger.debug(f"🔍 Normalized targets: {normalized_targets}")
+        
         # Strategy 1: Extract from JSON data (most reliable for Mango)
         product_data = self._extract_mango_json_data(soup)
         if product_data:
+            self.logger.debug(f"📊 Found {len(product_data)} JSON product data objects")
             json_sizes = self._extract_sizes_from_mango_json(product_data, normalized_targets)
+            if json_sizes:
+                self.logger.info(f"📊 JSON data found sizes: {', '.join(sorted(json_sizes))}")
+            else:
+                self.logger.debug("📊 No sizes found in JSON data")
             available_sizes.update(json_sizes)
+        else:
+            self.logger.debug("📊 No JSON product data found")
         
         # Strategy 2: Check HTML size buttons/elements
         html_sizes = self._check_mango_html_sizes(soup, normalized_targets)
+        if html_sizes:
+            self.logger.info(f"🌐 HTML elements found sizes: {', '.join(sorted(html_sizes))}")
+        else:
+            self.logger.debug("🌐 No sizes found in HTML elements")
         available_sizes.update(html_sizes)
         
         return available_sizes

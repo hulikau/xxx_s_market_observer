@@ -249,7 +249,15 @@ class MarketplaceMonitor:
                 )
             
             # Parse the page
+            self.logger.info(f"🔍 Parsing {site.name} - {url}")
             result = parser.parse(url, site.sizes)
+            
+            # Log parsing summary
+            if result.error:
+                self.logger.warning(f"❌ Parsing failed for {site.name}: {result.error}")
+            else:
+                status = "✅ IN STOCK" if result.in_stock else "❌ OUT OF STOCK"
+                self.logger.info(f"{status} - {site.name} ({len(result.available_sizes)} sizes available)")
             
             return MonitorResult(
                 site_name=site.name,
