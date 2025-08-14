@@ -3,7 +3,7 @@
 import json
 import re
 import requests
-from typing import List, Set
+from typing import List, Set, Optional, Dict
 from .base import BaseParser, ParseResult
 
 
@@ -199,12 +199,18 @@ class MangoParser(BaseParser):
             script_content = script.string.strip()
             
             # Pattern 1: self.__next_f.push with product data
-            if 'self.__next_f.push' in script_content and 'productInfo' in script_content:
+            if 'self.__next_f.push' in script_content and ('productInfo' in script_content or 'product' in script_content or 'reference' in script_content):
                 try:
                     # Extract JSON from the push call
                     json_match = re.search(r'self\.__next_f\.push\(\[.*?,\s*"([^"]*(?:\\.[^"]*)*)"\s*\]\)', script_content)
                     if json_match:
                         json_str = json_match.group(1).replace('\\"', '"').replace('\\\\', '\\')
+                        
+                        # Try Next.js specific parsing first
+                        nextjs_data = self._parse_nextjs_product_data(json_str)
+                        if nextjs_data:
+                            product_data.append(nextjs_data)
+                        
                         # Try to parse as JSON
                         try:
                             data = json.loads(json_str)
@@ -243,12 +249,76 @@ class MangoParser(BaseParser):
         
         return product_data
     
+    def _parse_nextjs_product_data(self, data_string: str) -> Optional[Dict]:
+        """Parse product data from Next.js streaming content."""
+        try:
+            # Look for product reference pattern
+            if '"reference":"87007197"' in data_string or '"name":"Kombiniertes' in data_string:
+                self.logger.debug("Found product reference in Next.js data")
+                
+                # Extract size-related data patterns
+                size_patterns = {
+                    'sizes': re.findall(r'"sizes?":\s*\[([^\]]*)\]', data_string, re.IGNORECASE),
+                    'variants': re.findall(r'"variants?":\s*\[([^\]]*)\]', data_string, re.IGNORECASE),
+                    'stock': re.findall(r'"stock":\s*(\w+)', data_string, re.IGNORECASE),
+                    'available': re.findall(r'"available":\s*(true|false)', data_string, re.IGNORECASE),
+                }
+                
+                # Look for individual size entries
+                size_entries = re.findall(r'"([XSMLXL]+)":\s*{[^}]*"available":\s*(true|false)', data_string)
+                
+                if any(size_patterns.values()) or size_entries:
+                    result = {
+                        'source': 'nextjs_stream',
+                        'patterns': size_patterns,
+                        'size_entries': size_entries,
+                        'raw_excerpt': data_string[:500] if len(data_string) > 500 else data_string
+                    }
+                    self.logger.debug(f"Extracted Next.js product data: {len(size_entries)} size entries")
+                    return result
+                    
+        except Exception as e:
+            self.logger.debug(f"Error parsing Next.js product data: {e}")
+        
+        return None
+    
     def _extract_sizes_from_mango_json(self, product_data: List[dict], normalized_targets: dict) -> Set[str]:
         """Extract available sizes from Mango's JSON data."""
         available_sizes = set()
         
         for item in product_data:
             if not isinstance(item, dict):
+                continue
+            
+            # Handle Next.js streaming data
+            if item.get('source') == 'nextjs_stream':
+                self.logger.debug("Processing Next.js streaming data for sizes")
+                
+                # Check size entries (individual size availability)
+                size_entries = item.get('size_entries', [])
+                for size_name, is_available in size_entries:
+                    if is_available.lower() == 'true':
+                        normalized = self._normalize_size(size_name)
+                        for norm_target, original_target in normalized_targets.items():
+                            if norm_target == normalized or norm_target in normalized:
+                                available_sizes.add(original_target)
+                                self.logger.debug(f"Found available size from Next.js: {original_target}")
+                
+                # Check pattern matches
+                patterns = item.get('patterns', {})
+                for pattern_name, matches in patterns.items():
+                    if matches:
+                        self.logger.debug(f"Found {pattern_name} pattern matches: {matches}")
+                        for match in matches:
+                            # Extract individual sizes from the match
+                            size_tokens = re.findall(r'"([XSMLXL]+)"', match)
+                            for size_token in size_tokens:
+                                normalized = self._normalize_size(size_token)
+                                for norm_target, original_target in normalized_targets.items():
+                                    if norm_target == normalized or norm_target in normalized:
+                                        available_sizes.add(original_target)
+                                        self.logger.debug(f"Found available size from pattern: {original_target}")
+                
                 continue
             
             # Look for productInfo with colors and sizes
