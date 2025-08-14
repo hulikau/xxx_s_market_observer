@@ -12,8 +12,8 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="marketplace-monitor",
     version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Anton Hulikau",
+    author_email="antonhulikau@gmail.com",
     description="A tool to monitor marketplace sites for product availability",
     long_description=long_description,
     long_description_content_type="text/markdown",
