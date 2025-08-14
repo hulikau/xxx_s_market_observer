@@ -54,7 +54,7 @@ class MarketplaceMonitor:
         self.config = self.config_manager.get()
         self.stats = MonitorStats()
         self.running = False
-        self._stop_event = asyncio.Event()
+        self._stop_event = None
         
         # Setup logging
         self._setup_logging()
@@ -122,7 +122,8 @@ class MarketplaceMonitor:
             return
         
         self.running = True
-        self._stop_event.clear()
+        # Create event in the current event loop
+        self._stop_event = asyncio.Event()
         self.stats = MonitorStats()
         
         self.logger.info("Starting marketplace monitoring...")
@@ -333,7 +334,8 @@ class MarketplaceMonitor:
         
         self.logger.info("Stopping monitoring...")
         self.running = False
-        self._stop_event.set()
+        if self._stop_event:
+            self._stop_event.set()
     
     async def check_single_site(self, site_name: str) -> List[MonitorResult]:
         """Check a single site manually.
