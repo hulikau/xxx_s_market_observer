@@ -46,11 +46,11 @@ class BaseParser(ABC):
         })
         
         # Add custom headers if provided
-        if 'headers' in self.config:
+        if 'headers' in self.config and self.config['headers'] is not None:
             self.session.headers.update(self.config['headers'])
         
         # Add cookies if provided
-        if 'cookies' in self.config:
+        if 'cookies' in self.config and self.config['cookies'] is not None:
             self.session.cookies.update(self.config['cookies'])
     
     @abstractmethod
