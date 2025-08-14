@@ -57,11 +57,15 @@ class ParserRegistry:
         # Create new instance
         try:
             parser_class = self._parsers[name]
+            self.logger.debug(f"Creating parser instance for {name} with config: {config}")
             instance = parser_class(name, config)
             self._instances[instance_key] = instance
+            self.logger.info(f"Successfully created parser instance: {name}")
             return instance
         except Exception as e:
             self.logger.error(f"Failed to create parser instance {name}: {e}")
+            import traceback
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
             return None
     
     def get_parser_for_url(self, url: str, config: Dict = None) -> Optional[BaseParser]:

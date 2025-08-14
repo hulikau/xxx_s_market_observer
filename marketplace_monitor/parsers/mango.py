@@ -281,7 +281,7 @@ class MangoParser(BaseParser):
     def _is_mango_size_unavailable(self, element) -> bool:
         """Check if a Mango size element indicates the size is unavailable."""
         # Check standard unavailability indicators
-        if super()._is_size_unavailable(element):
+        if self._is_size_unavailable(element):
             return True
         
         # Mango-specific unavailability indicators
@@ -343,12 +343,11 @@ class MangoParser(BaseParser):
     
     def _normalize_size(self, size: str) -> str:
         """Normalize size string for Mango-specific comparison."""
-        normalized = super()._normalize_size(size)
+        normalized = BaseParser._normalize_size(self, size)
         
         # Mango-specific normalizations
         mango_mappings = {
-            'EINHEITSGRÖSSE': 'U',
-            'EINHEITSGRÖSSE': 'U',
+            'EINHEITSGRÖSSE': 'U',  # German with umlaut
             'ONE SIZE': 'U',
             'UNICA': 'U',
         }
