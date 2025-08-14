@@ -2,25 +2,13 @@
 
 import json
 import re
+import requests
 from typing import List, Set
 from .base import BaseParser, ParseResult
 
 
 class MangoParser(BaseParser):
     """Parser specifically for Mango.com."""
-    
-    def __init__(self, site_name: str, config: dict = None):
-        """Initialize Mango parser with mobile user agent to avoid bot detection."""
-        super().__init__(site_name, config)
-        
-        # Use mobile user agent - this bypasses Mango's bot detection
-        # Desktop browser headers trigger 403, but mobile works
-        self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'de-de',
-            'Accept-Encoding': 'gzip, deflate, br',
-        })
     
     def can_parse(self, url: str) -> bool:
         """Check if URL is from Mango."""
@@ -59,7 +47,7 @@ class MangoParser(BaseParser):
         return result
     
     def _fetch_page(self, url: str, timeout: int = 30):
-        """Fetch page with mobile user agent (bypasses Mango's bot detection)."""
+        """Fetch page using requests.get() directly."""
         import time
         import random
         
@@ -67,16 +55,24 @@ class MangoParser(BaseParser):
             # Add a small random delay to be respectful
             time.sleep(random.uniform(1, 2))
             
-            # Make the request - mobile user agent should work
-            response = self.session.get(url, timeout=timeout, allow_redirects=True)
+            # Use mobile user agent headers to bypass bot detection
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'de-de',
+                'Accept-Encoding': 'gzip, deflate, br',
+            }
+            
+            # Make the request using requests.get() directly
+            response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
             response.raise_for_status()
             
-            # Try to detect encoding
-            if response.encoding is None:
-                response.encoding = 'utf-8'
+            # Get raw HTML text
+            html_text = response.text
             
+            # Parse HTML text with BeautifulSoup
             from bs4 import BeautifulSoup
-            soup = BeautifulSoup(response.text, 'lxml')
+            soup = BeautifulSoup(html_text, 'html.parser')
             return soup
             
         except Exception as e:

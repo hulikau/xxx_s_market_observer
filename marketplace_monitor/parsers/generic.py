@@ -1,6 +1,7 @@
 """Generic parser that works with many e-commerce sites."""
 
 import re
+import requests
 from typing import List, Set
 from .base import BaseParser, ParseResult
 
@@ -57,6 +58,42 @@ class GenericParser(BaseParser):
             result.error = str(e)
         
         return result
+    
+    def _fetch_page(self, url: str, timeout: int = 30):
+        """Fetch page using requests.get() directly for generic sites."""
+        import time
+        import random
+        
+        try:
+            # Add a small random delay to be respectful
+            time.sleep(random.uniform(1, 2))
+            
+            # Generic headers that work with most sites
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            
+            # Make the request using requests.get() directly
+            response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+            
+            # Get raw HTML text
+            html_text = response.text
+            
+            # Parse HTML text with BeautifulSoup
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_text, 'html.parser')
+            return soup
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch {url}: {e}")
+            return None
     
     def _check_size_availability_comprehensive(self, soup, target_sizes: List[str]) -> Set[str]:
         """Comprehensive size availability check using multiple strategies."""

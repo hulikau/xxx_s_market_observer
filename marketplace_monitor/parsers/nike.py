@@ -2,6 +2,7 @@
 
 import json
 import re
+import requests
 from typing import List, Set
 from .base import BaseParser, ParseResult
 
@@ -44,6 +45,42 @@ class NikeParser(BaseParser):
             result.error = str(e)
         
         return result
+    
+    def _fetch_page(self, url: str, timeout: int = 30):
+        """Fetch page using requests.get() directly for Nike."""
+        import time
+        import random
+        
+        try:
+            # Add a small random delay to be respectful
+            time.sleep(random.uniform(1, 2))
+            
+            # Nike-specific headers
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
+            
+            # Make the request using requests.get() directly
+            response = requests.get(url, headers=headers, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+            
+            # Get raw HTML text
+            html_text = response.text
+            
+            # Parse HTML text with BeautifulSoup
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(html_text, 'html.parser')
+            return soup
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch {url}: {e}")
+            return None
     
     def _extract_nike_product_name(self, soup) -> str:
         """Extract product name from Nike page."""
