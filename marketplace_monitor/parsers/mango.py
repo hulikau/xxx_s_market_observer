@@ -377,7 +377,7 @@ class MangoParser(BaseParser):
     
     def _normalize_size(self, size: str) -> str:
         """Normalize size string for Mango-specific comparison."""
-        normalized = BaseParser._normalize_size(self, size)
+        normalized = super()._normalize_size(size)
         
         # Mango-specific normalizations
         mango_mappings = {

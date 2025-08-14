@@ -134,19 +134,30 @@ class MarketplaceMonitor:
                 # Run monitoring cycle
                 await self._run_monitoring_cycle()
                 
-                # Wait for next cycle
-                try:
-                    await asyncio.wait_for(
-                        self._stop_event.wait(),
-                        timeout=self.config.global_check_interval
-                    )
-                except asyncio.TimeoutError:
-                    pass  # Normal timeout, continue monitoring
+                # Wait for next cycle or stop event
+                if self.running:
+                    try:
+                        await asyncio.wait_for(
+                            self._stop_event.wait(),
+                            timeout=self.config.global_check_interval
+                        )
+                    except asyncio.TimeoutError:
+                        pass  # Normal timeout, continue monitoring
                 
         except Exception as e:
             self.logger.error(f"Monitoring error: {e}")
         finally:
             self.running = False
+            # Cancel any pending tasks
+            current_task = asyncio.current_task()
+            all_tasks = [task for task in asyncio.all_tasks() if task != current_task and not task.done()]
+            if all_tasks:
+                self.logger.debug(f"Cancelling {len(all_tasks)} pending tasks")
+                for task in all_tasks:
+                    task.cancel()
+                # Wait for tasks to complete cancellation
+                await asyncio.gather(*all_tasks, return_exceptions=True)
+            
             self.logger.info("Monitoring stopped")
     
     async def _run_monitoring_cycle(self):
