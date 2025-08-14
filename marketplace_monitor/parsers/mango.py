@@ -9,6 +9,19 @@ from .base import BaseParser, ParseResult
 class MangoParser(BaseParser):
     """Parser specifically for Mango.com."""
     
+    def __init__(self, site_name: str, config: dict = None):
+        """Initialize Mango parser with mobile user agent to avoid bot detection."""
+        super().__init__(site_name, config)
+        
+        # Use mobile user agent - this bypasses Mango's bot detection
+        # Desktop browser headers trigger 403, but mobile works
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'de-de',
+            'Accept-Encoding': 'gzip, deflate, br',
+        })
+    
     def can_parse(self, url: str) -> bool:
         """Check if URL is from Mango."""
         domain = self.get_domain(url)
@@ -44,6 +57,31 @@ class MangoParser(BaseParser):
             result.error = str(e)
         
         return result
+    
+    def _fetch_page(self, url: str, timeout: int = 30):
+        """Fetch page with mobile user agent (bypasses Mango's bot detection)."""
+        import time
+        import random
+        
+        try:
+            # Add a small random delay to be respectful
+            time.sleep(random.uniform(1, 2))
+            
+            # Make the request - mobile user agent should work
+            response = self.session.get(url, timeout=timeout, allow_redirects=True)
+            response.raise_for_status()
+            
+            # Try to detect encoding
+            if response.encoding is None:
+                response.encoding = 'utf-8'
+            
+            from bs4 import BeautifulSoup
+            soup = BeautifulSoup(response.text, 'lxml')
+            return soup
+            
+        except Exception as e:
+            self.logger.error(f"Failed to fetch {url}: {e}")
+            return None
     
     def _extract_mango_product_name(self, soup) -> str:
         """Extract product name from Mango page."""
